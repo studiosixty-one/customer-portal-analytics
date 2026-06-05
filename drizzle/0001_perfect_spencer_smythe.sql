@@ -1,0 +1,1 @@
+ALTER TABLE "organizations" ADD COLUMN "can_add_sites" boolean DEFAULT true NOT NULL;

@@ -1,0 +1,17 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "analytics-collector",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-09-01",
+  "observability": { "enabled": true },
+
+  // The columnar event store. Created automatically on first write.
+  "analytics_engine_datasets": [{ "binding": "ANALYTICS", "dataset": "events" }],
+
+  // Holds the daily-rotating visitor-hash salt. Create it once with:
+  //   npx wrangler kv namespace create SALT_KV
+  // then paste the printed id below (and a preview_id for `wrangler dev`).
+  "kv_namespaces": [
+    { "binding": "SALT_KV", "id": "36617f65668c40099d8bd00945c34131" }
+  ]
+}
