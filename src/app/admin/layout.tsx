@@ -1,4 +1,5 @@
 import { requireContext } from "@/lib/auth/context";
+import { env } from "@/lib/env";
 import { AppTopbar } from "@/components/shell/app-topbar";
 
 export default async function AdminLayout({
@@ -21,6 +22,7 @@ export default async function AdminLayout({
         }))}
         activeOrgId={ctx.org?.id ?? null}
         isSuperAdmin={ctx.isSuperAdmin}
+        crmPortalUrl={env.CRM_PORTAL_URL ?? null}
       />
       <main className="mx-auto max-w-7xl px-4 py-8">{children}</main>
     </div>
