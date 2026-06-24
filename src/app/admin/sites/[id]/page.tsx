@@ -10,6 +10,9 @@ import {
   getTopPages,
   getTopReferrers,
   getTrend,
+  getUtmCampaigns,
+  getUtmMediums,
+  getUtmSources,
   RANGES,
   type Range,
 } from "@/lib/analytics/queries";
@@ -55,6 +58,9 @@ export default async function SiteOverviewPage({
     devices,
     browsers,
     oses,
+    utmCampaigns,
+    utmSources,
+    utmMediums,
     realtime,
   ] = await Promise.all([
     getOverview(tid, range, filters),
@@ -65,6 +71,9 @@ export default async function SiteOverviewPage({
     getDevices(tid, range, filters),
     getBrowsers(tid, range, filters),
     getOSes(tid, range, filters),
+    getUtmCampaigns(tid, range, filters),
+    getUtmSources(tid, range, filters),
+    getUtmMediums(tid, range, filters),
     getRealtime(tid, filters),
   ]);
 
@@ -148,6 +157,32 @@ export default async function SiteOverviewPage({
           kind="os"
           {...cardProps}
         />
+      </div>
+
+      <div className="space-y-3">
+        <h2 className="text-sm font-medium text-muted-foreground">
+          Campaigns (UTM)
+        </h2>
+        <div className="grid gap-4 md:grid-cols-3">
+          <BreakdownCard
+            title="Campaigns"
+            rows={utmCampaigns}
+            kind="utm_campaign"
+            {...cardProps}
+          />
+          <BreakdownCard
+            title="Sources"
+            rows={utmSources}
+            kind="utm_source"
+            {...cardProps}
+          />
+          <BreakdownCard
+            title="Mediums"
+            rows={utmMediums}
+            kind="utm_medium"
+            {...cardProps}
+          />
+        </div>
       </div>
     </div>
   );

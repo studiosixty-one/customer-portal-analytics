@@ -1,4 +1,13 @@
-import { FileText, Globe, Monitor, Smartphone, Tablet } from "lucide-react";
+import {
+  FileText,
+  Globe,
+  Megaphone,
+  Monitor,
+  Share2,
+  Smartphone,
+  Tablet,
+  Tag,
+} from "lucide-react";
 import type { ReactNode } from "react";
 
 import { countryName, flagEmoji } from "@/lib/analytics/countries";
@@ -10,7 +19,10 @@ export type RowKind =
   | "country"
   | "device"
   | "browser"
-  | "os";
+  | "os"
+  | "utm_source"
+  | "utm_medium"
+  | "utm_campaign";
 
 // Brand-icon slugs on cdn.simpleicons.org. Rendered in a neutral gray so they
 // stay visible in both light and dark themes; BrandImg falls back if a slug is
@@ -87,6 +99,12 @@ export function RowIcon({
         fallback
       );
     }
+    case "utm_source":
+      return <Tag className="size-4 shrink-0 text-muted-foreground" />;
+    case "utm_medium":
+      return <Share2 className="size-4 shrink-0 text-muted-foreground" />;
+    case "utm_campaign":
+      return <Megaphone className="size-4 shrink-0 text-muted-foreground" />;
     default:
       return <FileText className="size-4 shrink-0 text-muted-foreground" />;
   }

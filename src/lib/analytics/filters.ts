@@ -12,6 +12,9 @@ export const FILTER_KEYS = [
   "device",
   "browser",
   "os",
+  "utm_source",
+  "utm_medium",
+  "utm_campaign",
 ] as const;
 
 export type FilterKey = (typeof FILTER_KEYS)[number];
@@ -24,6 +27,9 @@ export const FILTER_LABEL: Record<FilterKey, string> = {
   device: "Device",
   browser: "Browser",
   os: "OS",
+  utm_source: "UTM source",
+  utm_medium: "UTM medium",
+  utm_campaign: "Campaign",
 };
 
 export function parseFilters(

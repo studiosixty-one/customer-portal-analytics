@@ -46,6 +46,9 @@ const FILTER_COLUMN: Record<FilterKey, string> = {
   device: AE.device,
   browser: AE.browser,
   os: AE.os,
+  utm_source: AE.utmSource,
+  utm_medium: AE.utmMedium,
+  utm_campaign: AE.utmCampaign,
 };
 
 function filterClause(filters: Filters): string {
@@ -200,6 +203,9 @@ export const getTopCountries = breakdown("countries", AE.country);
 export const getDevices = breakdown("devices", AE.device);
 export const getBrowsers = breakdown("browsers", AE.browser);
 export const getOSes = breakdown("oses", AE.os);
+export const getUtmSources = breakdown("utm-sources", AE.utmSource);
+export const getUtmMediums = breakdown("utm-mediums", AE.utmMedium);
+export const getUtmCampaigns = breakdown("utm-campaigns", AE.utmCampaign);
 
 export const getRealtime = (trackingId: string, filters: Filters) =>
   unstable_cache(
