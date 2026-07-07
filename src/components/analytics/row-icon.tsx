@@ -7,6 +7,8 @@ import {
   Smartphone,
   Tablet,
   Tag,
+  User,
+  Zap,
 } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -22,7 +24,9 @@ export type RowKind =
   | "os"
   | "utm_source"
   | "utm_medium"
-  | "utm_campaign";
+  | "utm_campaign"
+  | "user"
+  | "event";
 
 // Brand-icon slugs on cdn.simpleicons.org. Rendered in a neutral gray so they
 // stay visible in both light and dark themes; BrandImg falls back if a slug is
@@ -105,6 +109,10 @@ export function RowIcon({
       return <Share2 className="size-4 shrink-0 text-muted-foreground" />;
     case "utm_campaign":
       return <Megaphone className="size-4 shrink-0 text-muted-foreground" />;
+    case "user":
+      return <User className="size-4 shrink-0 text-muted-foreground" />;
+    case "event":
+      return <Zap className="size-4 shrink-0 text-muted-foreground" />;
     default:
       return <FileText className="size-4 shrink-0 text-muted-foreground" />;
   }

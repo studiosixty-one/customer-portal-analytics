@@ -49,6 +49,7 @@ const FILTER_COLUMN: Record<FilterKey, string> = {
   utm_source: AE.utmSource,
   utm_medium: AE.utmMedium,
   utm_campaign: AE.utmCampaign,
+  user: AE.userId,
 };
 
 function filterClause(filters: Filters): string {
@@ -67,14 +68,25 @@ function resetClause(resetAt?: Date | null): string {
   return ` AND timestamp >= toDateTime('${ts}')`;
 }
 
-function pageviewWhere(
+// All events for a site (any event_type), scoped by range / filters / reset.
+function baseWhere(
   trackingId: string,
   days: number,
   filters: Filters,
   resetAt?: Date | null,
 ): string {
   const since = `timestamp >= now() - INTERVAL '${Math.max(1, Math.floor(days))}' DAY`;
-  return `${AE.trackingId} = '${cleanId(trackingId)}' AND ${AE.eventType} = 'pageview' AND ${since}${filterClause(filters)}${resetClause(resetAt)}`;
+  return `${AE.trackingId} = '${cleanId(trackingId)}' AND ${since}${filterClause(filters)}${resetClause(resetAt)}`;
+}
+
+// Pageviews only (the default for the core web-analytics metrics).
+function pageviewWhere(
+  trackingId: string,
+  days: number,
+  filters: Filters,
+  resetAt?: Date | null,
+): string {
+  return `${baseWhere(trackingId, days, filters, resetAt)} AND ${AE.eventType} = 'pageview'`;
 }
 
 function num(v: unknown): number {
@@ -182,6 +194,61 @@ async function fetchRealtime(
   }
 }
 
+// Top identified app users by activity (all events). `label` is their friendly
+// display label; `visitors` holds their total event count (for the bar/number).
+async function fetchUsers(
+  trackingId: string,
+  days: number,
+  filters: Filters,
+  resetAt?: Date | null,
+): Promise<StatRow[]> {
+  try {
+    const rows = await queryAE(
+      `SELECT ${AE.userId} AS key, max(${AE.userLabel}) AS label,
+              SUM(_sample_interval) AS visitors
+       FROM ${AE_DATASET}
+       WHERE ${baseWhere(trackingId, days, filters, resetAt)} AND ${AE.userId} != ''
+       GROUP BY ${AE.userId} ORDER BY visitors DESC LIMIT 10`,
+    );
+    return rows.map((r) => ({
+      key: String(r.key ?? ""),
+      label: r.label ? String(r.label) : undefined,
+      views: num(r.visitors),
+      visitors: num(r.visitors),
+    }));
+  } catch (e) {
+    console.error("[analytics] users failed:", e);
+    return [];
+  }
+}
+
+// Top custom events (event_type != pageview) by count.
+async function fetchEvents(
+  trackingId: string,
+  days: number,
+  filters: Filters,
+  resetAt?: Date | null,
+): Promise<StatRow[]> {
+  try {
+    const rows = await queryAE(
+      `SELECT ${AE.eventType} AS key, SUM(_sample_interval) AS visitors,
+              COUNT(DISTINCT ${AE.userId}) AS users
+       FROM ${AE_DATASET}
+       WHERE ${baseWhere(trackingId, days, filters, resetAt)}
+         AND ${AE.eventType} != 'pageview' AND ${AE.eventType} != ''
+       GROUP BY ${AE.eventType} ORDER BY visitors DESC LIMIT 10`,
+    );
+    return rows.map((r) => ({
+      key: String(r.key ?? ""),
+      views: num(r.visitors),
+      visitors: num(r.visitors),
+    }));
+  } catch (e) {
+    console.error("[analytics] events failed:", e);
+    return [];
+  }
+}
+
 // ── Public, cached API (60s; realtime 20s). Filters are part of the cache key. ─
 const days = (r: Range) => RANGES[r];
 const fkey = (filters: Filters) => JSON.stringify(filters);
@@ -234,6 +301,30 @@ export const getOSes = breakdown("oses", AE.os);
 export const getUtmSources = breakdown("utm-sources", AE.utmSource);
 export const getUtmMediums = breakdown("utm-mediums", AE.utmMedium);
 export const getUtmCampaigns = breakdown("utm-campaigns", AE.utmCampaign);
+
+export const getTopUsers = (
+  trackingId: string,
+  range: Range,
+  filters: Filters,
+  resetAt?: Date | null,
+) =>
+  unstable_cache(
+    () => fetchUsers(trackingId, days(range), filters, resetAt),
+    ["users", trackingId, range, fkey(filters), rkey(resetAt)],
+    { revalidate: 60 },
+  )();
+
+export const getTopEvents = (
+  trackingId: string,
+  range: Range,
+  filters: Filters,
+  resetAt?: Date | null,
+) =>
+  unstable_cache(
+    () => fetchEvents(trackingId, days(range), filters, resetAt),
+    ["events", trackingId, range, fkey(filters), rkey(resetAt)],
+    { revalidate: 60 },
+  )();
 
 export const getRealtime = (
   trackingId: string,

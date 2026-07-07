@@ -18,6 +18,7 @@ export function BreakdownCard({
   siteId,
   range,
   filters,
+  linkable = true,
 }: {
   title: string;
   rows: StatRow[];
@@ -25,10 +26,12 @@ export function BreakdownCard({
   siteId: string;
   range: Range;
   filters: Filters;
+  /** When false, rows are display-only (no click-to-filter). */
+  linkable?: boolean;
 }) {
   const max = Math.max(1, ...rows.map((r) => r.visitors));
-  // Every breakdown kind is also a filter key (page, source, country, …).
-  const filterKey = kind as FilterKey;
+  const rowClass =
+    "relative flex items-center gap-2 overflow-hidden rounded px-2 py-1.5 text-sm";
 
   return (
     <Card>
@@ -42,14 +45,10 @@ export function BreakdownCard({
           </p>
         ) : (
           <ul className="space-y-0.5">
-            {rows.map((r) => (
-              <li key={r.key}>
-                <Link
-                  href={`/admin/sites/${siteId}${buildSiteQuery(range, withFilter(filters, filterKey, r.key))}`}
-                  scroll={false}
-                  title={`Filter by ${rowLabel(kind, r.key)}`}
-                  className="relative flex items-center gap-2 overflow-hidden rounded px-2 py-1.5 text-sm transition-colors hover:bg-muted"
-                >
+            {rows.map((r) => {
+              const label = r.label ?? rowLabel(kind, r.key);
+              const inner = (
+                <>
                   <span
                     className="absolute inset-y-0 left-0 rounded bg-primary/10"
                     style={{ width: `${(r.visitors / max) * 100}%` }}
@@ -58,15 +57,29 @@ export function BreakdownCard({
                   <span className="relative">
                     <RowIcon kind={kind} value={r.key} />
                   </span>
-                  <span className="relative truncate">
-                    {rowLabel(kind, r.key)}
-                  </span>
+                  <span className="relative truncate">{label}</span>
                   <span className="relative ml-auto shrink-0 tabular-nums text-muted-foreground">
                     {r.visitors.toLocaleString()}
                   </span>
-                </Link>
-              </li>
-            ))}
+                </>
+              );
+              return (
+                <li key={r.key}>
+                  {linkable ? (
+                    <Link
+                      href={`/admin/sites/${siteId}${buildSiteQuery(range, withFilter(filters, kind as FilterKey, r.key))}`}
+                      scroll={false}
+                      title={`Filter by ${label}`}
+                      className={`${rowClass} transition-colors hover:bg-muted`}
+                    >
+                      {inner}
+                    </Link>
+                  ) : (
+                    <div className={rowClass}>{inner}</div>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         )}
       </CardContent>

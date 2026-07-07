@@ -7,8 +7,10 @@ import {
   getOverview,
   getRealtime,
   getTopCountries,
+  getTopEvents,
   getTopPages,
   getTopReferrers,
+  getTopUsers,
   getTrend,
   getUtmCampaigns,
   getUtmMediums,
@@ -62,6 +64,8 @@ export default async function SiteOverviewPage({
     utmCampaigns,
     utmSources,
     utmMediums,
+    users,
+    events,
     realtime,
   ] = await Promise.all([
     getOverview(tid, range, filters, reset),
@@ -75,6 +79,8 @@ export default async function SiteOverviewPage({
     getUtmCampaigns(tid, range, filters, reset),
     getUtmSources(tid, range, filters, reset),
     getUtmMediums(tid, range, filters, reset),
+    getTopUsers(tid, range, filters, reset),
+    getTopEvents(tid, range, filters, reset),
     getRealtime(tid, filters, reset),
   ]);
 
@@ -185,6 +191,29 @@ export default async function SiteOverviewPage({
           />
         </div>
       </div>
+
+      {(users.length > 0 || events.length > 0) && (
+        <div className="space-y-3">
+          <h2 className="text-sm font-medium text-muted-foreground">
+            App users
+          </h2>
+          <div className="grid gap-4 md:grid-cols-2">
+            <BreakdownCard
+              title="Top users"
+              rows={users}
+              kind="user"
+              {...cardProps}
+            />
+            <BreakdownCard
+              title="Events"
+              rows={events}
+              kind="event"
+              linkable={false}
+              {...cardProps}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

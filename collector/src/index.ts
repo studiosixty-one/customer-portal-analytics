@@ -50,22 +50,38 @@ export default {
 
 // ── Tracking script ───────────────────────────────────────────────────────────
 function serveScript(): Response {
-  // Minified-ish, dependency-free. Derives its own endpoint from the script src,
-  // so the same Worker can be reached at any hostname. Tracks the initial
-  // pageview plus client-side (SPA) route changes via the History API.
-  // Sends a non-credentialed text/plain POST: no cookies (cookieless) and a
-  // CORS "simple request", so there's no preflight and wildcard ACAO is valid.
-  // `keepalive` lets it survive the page unload like sendBeacon would.
+  // Minified-ish, dependency-free. Derives its own endpoint from the script src.
+  // Auto-tracks the initial pageview + SPA route changes (History API). Exposes
+  // a global s61() for identified analytics:
+  //   s61('identify', userId, label?)  — tie this browser to an app user
+  //   s61('track', 'event_name', props?) — log a custom action
+  //   s61('reset')                       — clear identity (on logout)
+  // Identity persists in sessionStorage so it survives reloads/SPA nav in-tab.
+  // A pre-load queue (window.s61.q) is replayed so early identify() calls apply
+  // to the first pageview. Sends a non-credentialed text/plain POST (cookieless,
+  // no CORS preflight); keepalive survives page unload.
   const js = `(function(){
   var s=document.currentScript;if(!s)return;
   var site=s.getAttribute("data-site");if(!site)return;
   var endpoint=new URL(s.src).origin+"/event";
-  function send(type){try{
-    var q=new URLSearchParams(location.search);
+  var SS;try{SS=window.sessionStorage}catch(e){}
+  function uid(){try{return[SS.getItem("_s61u")||"",SS.getItem("_s61l")||""]}catch(e){return["",""]}}
+  function send(type,props){try{
+    var q=new URLSearchParams(location.search),id=uid();
     var body=JSON.stringify({s:site,e:type||"pageview",p:location.pathname,h:location.hostname,r:document.referrer||"",w:screen.width||0,
-      utm_source:q.get("utm_source")||"",utm_medium:q.get("utm_medium")||"",utm_campaign:q.get("utm_campaign")||""});
+      utm_source:q.get("utm_source")||"",utm_medium:q.get("utm_medium")||"",utm_campaign:q.get("utm_campaign")||"",
+      u:id[0],ul:id[1],pr:props?JSON.stringify(props):""});
     fetch(endpoint,{method:"POST",body:body,mode:"cors",credentials:"omit",keepalive:true,headers:{"Content-Type":"text/plain"}});
   }catch(e){}}
+  function api(cmd,a,b){
+    if(cmd==="identify"){try{SS.setItem("_s61u",String(a||""));SS.setItem("_s61l",b?String(b):"")}catch(e){}}
+    else if(cmd==="track"){send(String(a||"event"),b)}
+    else if(cmd==="reset"){try{SS.removeItem("_s61u");SS.removeItem("_s61l")}catch(e){}}
+    else if(cmd==="pageview"){send("pageview")}
+  }
+  var prev=window.s61;
+  window.s61=function(){api.apply(null,arguments)};
+  if(prev&&prev.q)for(var i=0;i<prev.q.length;i++)api.apply(null,prev.q[i]);
   send("pageview");
   var last=location.pathname;
   function nav(){if(location.pathname!==last){last=location.pathname;send("pageview");}}
@@ -116,7 +132,7 @@ async function handleEvent(request: Request, env: Env): Promise<Response> {
   env.ANALYTICS.writeDataPoint({
     indexes: [site],
     blobs: [
-      str(body.e, 64) || "pageview", // blob1 event_type
+      str(body.e, 64) || "pageview", // blob1 event_type (custom name or "pageview")
       path, // blob2
       hostname, // blob3
       referrerHost(referrer, hostname), // blob4
@@ -129,6 +145,9 @@ async function handleEvent(request: Request, env: Env): Promise<Response> {
       str(body.utm_medium, 255), // blob11
       str(body.utm_campaign, 255), // blob12
       city, // blob13
+      str(body.u, 255), // blob14 app user id
+      str(body.ul, 255), // blob15 user display label
+      str(body.pr, 2048), // blob16 custom-event props (JSON)
     ],
     doubles: [1, lat, lng], // double1 count · double2 lat · double3 lng
   });

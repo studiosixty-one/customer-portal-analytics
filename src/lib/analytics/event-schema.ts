@@ -24,6 +24,12 @@ export const AE = {
   utmMedium: "blob11",
   utmCampaign: "blob12",
   city: "blob13",
+  /** Identified app-user id (opaque, provided by the customer's app). */
+  userId: "blob14",
+  /** Friendly display label for the user (name / plan / role). */
+  userLabel: "blob15",
+  /** Custom-event properties, JSON-encoded (stored for display). */
+  props: "blob16",
   count: "double1",
   /** Approx visitor coordinates (Cloudflare geo) for the globe. */
   lat: "double2",
