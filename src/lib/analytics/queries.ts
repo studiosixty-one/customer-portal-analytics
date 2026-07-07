@@ -203,12 +203,14 @@ async function fetchUsers(
   resetAt?: Date | null,
 ): Promise<StatRow[]> {
   try {
+    // AE can't aggregate String columns (no max(label)), so group by id + label.
+    // A stable label yields one row per user; a changed label is a second row.
     const rows = await queryAE(
-      `SELECT ${AE.userId} AS key, max(${AE.userLabel}) AS label,
+      `SELECT ${AE.userId} AS key, ${AE.userLabel} AS label,
               SUM(_sample_interval) AS visitors
        FROM ${AE_DATASET}
        WHERE ${baseWhere(trackingId, days, filters, resetAt)} AND ${AE.userId} != ''
-       GROUP BY ${AE.userId} ORDER BY visitors DESC LIMIT 10`,
+       GROUP BY key, label ORDER BY visitors DESC LIMIT 10`,
     );
     return rows.map((r) => ({
       key: String(r.key ?? ""),
