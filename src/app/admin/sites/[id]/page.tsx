@@ -48,6 +48,7 @@ export default async function SiteOverviewPage({
 
   const { site } = await requireSiteAccess(id);
   const tid = site.trackingId;
+  const reset = site.statsResetAt; // "reset views" floor (null = show all)
 
   const [
     overview,
@@ -63,18 +64,18 @@ export default async function SiteOverviewPage({
     utmMediums,
     realtime,
   ] = await Promise.all([
-    getOverview(tid, range, filters),
-    getTrend(tid, range, filters),
-    getTopPages(tid, range, filters),
-    getTopReferrers(tid, range, filters),
-    getTopCountries(tid, range, filters),
-    getDevices(tid, range, filters),
-    getBrowsers(tid, range, filters),
-    getOSes(tid, range, filters),
-    getUtmCampaigns(tid, range, filters),
-    getUtmSources(tid, range, filters),
-    getUtmMediums(tid, range, filters),
-    getRealtime(tid, filters),
+    getOverview(tid, range, filters, reset),
+    getTrend(tid, range, filters, reset),
+    getTopPages(tid, range, filters, reset),
+    getTopReferrers(tid, range, filters, reset),
+    getTopCountries(tid, range, filters, reset),
+    getDevices(tid, range, filters, reset),
+    getBrowsers(tid, range, filters, reset),
+    getOSes(tid, range, filters, reset),
+    getUtmCampaigns(tid, range, filters, reset),
+    getUtmSources(tid, range, filters, reset),
+    getUtmMediums(tid, range, filters, reset),
+    getRealtime(tid, filters, reset),
   ]);
 
   const cardProps = { siteId: id, range, filters };

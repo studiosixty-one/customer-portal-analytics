@@ -89,5 +89,16 @@ export async function checkInstall(id: string) {
 /** Live visitor locations for the globe widget (polled by the client). */
 export async function liveLocations(id: string, filters: Filters = {}) {
   const { site } = await requireSiteAccess(id);
-  return getLiveLocations(site.trackingId, filters);
+  return getLiveLocations(site.trackingId, filters, site.statsResetAt);
+}
+
+/** Soft-reset a site's stats: hide all data collected before now. */
+export async function resetSiteViews(id: string) {
+  const { ctx } = await requireSiteAccess(id);
+  requireRole(ctx, ["owner", "admin"]);
+  await db
+    .update(sites)
+    .set({ statsResetAt: new Date() })
+    .where(eq(sites.id, id));
+  revalidatePath(`/admin/sites/${id}`, "layout");
 }

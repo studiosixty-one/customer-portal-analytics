@@ -8,6 +8,7 @@ import {
   deleteSite,
   regenerateTrackingId,
   renameSite,
+  resetSiteViews,
   updateSiteDomain,
 } from "@/lib/sites/actions";
 import { Button } from "@/components/ui/button";
@@ -35,11 +36,13 @@ export function SiteSettings({
   name: initialName,
   domain: initialDomain,
   trackingId,
+  statsResetAt,
 }: {
   id: string;
   name: string;
   domain: string;
   trackingId: string;
+  statsResetAt: string | null;
 }) {
   const router = useRouter();
   const [name, setName] = useState(initialName);
@@ -67,6 +70,18 @@ export function SiteSettings({
         router.refresh();
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Failed to regenerate");
+      }
+    });
+  }
+
+  function reset() {
+    start(async () => {
+      try {
+        await resetSiteViews(id);
+        toast.success("Views reset — counting fresh from now");
+        router.refresh();
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Failed to reset");
       }
     });
   }
@@ -145,6 +160,50 @@ export function SiteSettings({
               <DialogFooter>
                 <Button onClick={rotate} disabled={pending}>
                   Regenerate
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Reset views</CardTitle>
+          <CardDescription>
+            Set every counter back to zero and start counting fresh from now.
+            Data collected before the reset stops showing in the dashboard and
+            can&apos;t be recovered. Your tracking snippet keeps working — no
+            reinstall needed.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {statsResetAt && (
+            <p className="text-xs text-muted-foreground">
+              Last reset:{" "}
+              <span suppressHydrationWarning>
+                {new Date(statsResetAt).toLocaleString()}
+              </span>
+            </p>
+          )}
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm">
+                Reset views
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Reset all views?</DialogTitle>
+                <DialogDescription>
+                  Every metric — visitors, pageviews, sources, campaigns, and the
+                  map — will restart from zero and only count traffic from now on.
+                  Past data is hidden and can&apos;t be brought back.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button onClick={reset} disabled={pending}>
+                  Reset views
                 </Button>
               </DialogFooter>
             </DialogContent>

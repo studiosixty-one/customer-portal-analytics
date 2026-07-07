@@ -124,6 +124,10 @@ export const sites = pgTable(
     // Engine index (index1). Globally unique, opaque, regenerable.
     trackingId: text("tracking_id").notNull().unique(),
     settings: jsonb("settings").$type<SiteSettings>().notNull().default({}),
+    // "Reset views": when set, the dashboard only counts events on/after this
+    // time. Analytics Engine is append-only, so this hides prior data rather
+    // than deleting it (old rows age out of AE within ~90 days anyway).
+    statsResetAt: timestamp("stats_reset_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),

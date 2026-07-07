@@ -15,6 +15,7 @@ export default async function SiteSettingsPage({
       name={site.name}
       domain={site.domain}
       trackingId={site.trackingId}
+      statsResetAt={site.statsResetAt ? site.statsResetAt.toISOString() : null}
     />
   );
 }

@@ -60,13 +60,21 @@ function filterClause(filters: Filters): string {
   return c;
 }
 
+// "Reset views" floor: only count events on/after the site's reset time.
+function resetClause(resetAt?: Date | null): string {
+  if (!resetAt) return "";
+  const ts = resetAt.toISOString().slice(0, 19).replace("T", " ");
+  return ` AND timestamp >= toDateTime('${ts}')`;
+}
+
 function pageviewWhere(
   trackingId: string,
   days: number,
   filters: Filters,
+  resetAt?: Date | null,
 ): string {
   const since = `timestamp >= now() - INTERVAL '${Math.max(1, Math.floor(days))}' DAY`;
-  return `${AE.trackingId} = '${cleanId(trackingId)}' AND ${AE.eventType} = 'pageview' AND ${since}${filterClause(filters)}`;
+  return `${AE.trackingId} = '${cleanId(trackingId)}' AND ${AE.eventType} = 'pageview' AND ${since}${filterClause(filters)}${resetClause(resetAt)}`;
 }
 
 function num(v: unknown): number {
@@ -79,11 +87,12 @@ async function fetchOverview(
   trackingId: string,
   days: number,
   filters: Filters,
+  resetAt?: Date | null,
 ): Promise<Overview> {
   try {
     const [row] = await queryAE(
       `SELECT SUM(_sample_interval) AS views, COUNT(DISTINCT ${AE.visitor}) AS visitors
-       FROM ${AE_DATASET} WHERE ${pageviewWhere(trackingId, days, filters)}`,
+       FROM ${AE_DATASET} WHERE ${pageviewWhere(trackingId, days, filters, resetAt)}`,
     );
     const pageviews = num(row?.views);
     const visitors = num(row?.visitors);
@@ -102,6 +111,7 @@ async function fetchTrend(
   trackingId: string,
   days: number,
   filters: Filters,
+  resetAt?: Date | null,
 ): Promise<TrendPoint[]> {
   const bucketExpr =
     days <= 1 ? "toStartOfHour(timestamp)" : "toStartOfDay(timestamp)";
@@ -111,7 +121,7 @@ async function fetchTrend(
     const rows = await queryAE(
       `SELECT ${bucketExpr} AS bucket, SUM(_sample_interval) AS views,
               COUNT(DISTINCT ${AE.visitor}) AS visitors
-       FROM ${AE_DATASET} WHERE ${pageviewWhere(trackingId, days, filters)}
+       FROM ${AE_DATASET} WHERE ${pageviewWhere(trackingId, days, filters, resetAt)}
        GROUP BY bucket ORDER BY bucket`,
     );
     return rows.map((r) => ({
@@ -130,6 +140,7 @@ async function fetchBreakdown(
   column: string,
   days: number,
   filters: Filters,
+  resetAt?: Date | null,
   limit = 10,
 ): Promise<StatRow[]> {
   try {
@@ -137,7 +148,7 @@ async function fetchBreakdown(
       `SELECT ${column} AS key, SUM(_sample_interval) AS views,
               COUNT(DISTINCT ${AE.visitor}) AS visitors
        FROM ${AE_DATASET}
-       WHERE ${pageviewWhere(trackingId, days, filters)} AND ${column} != ''
+       WHERE ${pageviewWhere(trackingId, days, filters, resetAt)} AND ${column} != ''
        GROUP BY ${column} ORDER BY visitors DESC LIMIT ${Math.floor(limit)}`,
     );
     return rows.map((r) => ({
@@ -154,6 +165,7 @@ async function fetchBreakdown(
 async function fetchRealtime(
   trackingId: string,
   filters: Filters,
+  resetAt?: Date | null,
 ): Promise<number> {
   try {
     const [row] = await queryAE(
@@ -161,7 +173,7 @@ async function fetchRealtime(
        FROM ${AE_DATASET}
        WHERE ${AE.trackingId} = '${cleanId(trackingId)}'
          AND ${AE.eventType} = 'pageview'
-         AND timestamp >= now() - INTERVAL '5' MINUTE${filterClause(filters)}`,
+         AND timestamp >= now() - INTERVAL '5' MINUTE${filterClause(filters)}${resetClause(resetAt)}`,
     );
     return num(row?.visitors);
   } catch (e) {
@@ -173,27 +185,43 @@ async function fetchRealtime(
 // ── Public, cached API (60s; realtime 20s). Filters are part of the cache key. ─
 const days = (r: Range) => RANGES[r];
 const fkey = (filters: Filters) => JSON.stringify(filters);
+const rkey = (resetAt?: Date | null) => String(resetAt ? resetAt.getTime() : 0);
 
-export const getOverview = (trackingId: string, range: Range, filters: Filters) =>
+export const getOverview = (
+  trackingId: string,
+  range: Range,
+  filters: Filters,
+  resetAt?: Date | null,
+) =>
   unstable_cache(
-    () => fetchOverview(trackingId, days(range), filters),
-    ["overview", trackingId, range, fkey(filters)],
+    () => fetchOverview(trackingId, days(range), filters, resetAt),
+    ["overview", trackingId, range, fkey(filters), rkey(resetAt)],
     { revalidate: 60 },
   )();
 
-export const getTrend = (trackingId: string, range: Range, filters: Filters) =>
+export const getTrend = (
+  trackingId: string,
+  range: Range,
+  filters: Filters,
+  resetAt?: Date | null,
+) =>
   unstable_cache(
-    () => fetchTrend(trackingId, days(range), filters),
-    ["trend", trackingId, range, fkey(filters)],
+    () => fetchTrend(trackingId, days(range), filters, resetAt),
+    ["trend", trackingId, range, fkey(filters), rkey(resetAt)],
     { revalidate: 60 },
   )();
 
 const breakdown =
   (label: string, column: string) =>
-  (trackingId: string, range: Range, filters: Filters) =>
+  (
+    trackingId: string,
+    range: Range,
+    filters: Filters,
+    resetAt?: Date | null,
+  ) =>
     unstable_cache(
-      () => fetchBreakdown(trackingId, column, days(range), filters),
-      [label, trackingId, range, fkey(filters)],
+      () => fetchBreakdown(trackingId, column, days(range), filters, resetAt),
+      [label, trackingId, range, fkey(filters), rkey(resetAt)],
       { revalidate: 60 },
     )();
 
@@ -207,10 +235,14 @@ export const getUtmSources = breakdown("utm-sources", AE.utmSource);
 export const getUtmMediums = breakdown("utm-mediums", AE.utmMedium);
 export const getUtmCampaigns = breakdown("utm-campaigns", AE.utmCampaign);
 
-export const getRealtime = (trackingId: string, filters: Filters) =>
+export const getRealtime = (
+  trackingId: string,
+  filters: Filters,
+  resetAt?: Date | null,
+) =>
   unstable_cache(
-    () => fetchRealtime(trackingId, filters),
-    ["realtime", trackingId, fkey(filters)],
+    () => fetchRealtime(trackingId, filters, resetAt),
+    ["realtime", trackingId, fkey(filters), rkey(resetAt)],
     { revalidate: 20 },
   )();
 
@@ -242,6 +274,7 @@ export async function getInstallStatus(
 async function fetchLiveLocations(
   trackingId: string,
   filters: Filters,
+  resetAt?: Date | null,
 ): Promise<LiveLocation[]> {
   try {
     const rows = await queryAE(
@@ -249,7 +282,7 @@ async function fetchLiveLocations(
               ${AE.country} AS country, ${AE.city} AS city,
               COUNT(DISTINCT ${AE.visitor}) AS visitors
        FROM ${AE_DATASET}
-       WHERE ${pageviewWhere(trackingId, 1, filters)}
+       WHERE ${pageviewWhere(trackingId, 1, filters, resetAt)}
        GROUP BY lat, lng, country, city ORDER BY visitors DESC LIMIT 300`,
     );
 
@@ -278,9 +311,13 @@ async function fetchLiveLocations(
   }
 }
 
-export const getLiveLocations = (trackingId: string, filters: Filters) =>
+export const getLiveLocations = (
+  trackingId: string,
+  filters: Filters,
+  resetAt?: Date | null,
+) =>
   unstable_cache(
-    () => fetchLiveLocations(trackingId, filters),
-    ["live-locations", trackingId, fkey(filters)],
+    () => fetchLiveLocations(trackingId, filters, resetAt),
+    ["live-locations", trackingId, fkey(filters), rkey(resetAt)],
     { revalidate: 15 },
   )();

@@ -1,0 +1,1 @@
+ALTER TABLE "sites" ADD COLUMN "stats_reset_at" timestamp with time zone;
